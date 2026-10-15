@@ -1,0 +1,1298 @@
+pool: CASNGIN
+stages:
+- stage: retry_hello
+  jobs:
+  - job: retry_hello_world
+    steps:
+    - task: PowerShell@2
+      inputs:
+        targetType: 'inline'
+        script: 'Write-Host "Hello World"'
+		
+		
+		
+		
+		
+Pool: <agent pool name>
+
+
+________________________________________________________________________________________
+
+Terraform init and Terraform plan 
+________________________________________________________________________________________
+
+pool: yamlagent 
+stages:
+- stage: TerrafromInitandValidate
+  displayName: Terraform Init and Validate
+  jobs:
+  - job: Terraforminitandvalidate
+    steps:
+    - task: TerraformTask@5
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/dev'
+        backendServiceArm: 'yamlconnection'
+        backendAzureRmStorageAccountName: '20sep26'
+        backendAzureRmContainerName: 'tfstate'
+        backendAzureRmKey: 'dev.tfstate'
+    - task: TerraformTask@5
+      inputs:
+        provider: 'azurerm'
+        command: 'validate'
+- stage: TerraformPlanandTerraformapply
+  displayName: Terraform plan and Apply
+  jobs:
+  - job: terraformPlanandTerraformapply
+    steps:
+    - task: TerraformTask@5
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/dev'
+        backendServiceArm: 'yamlconnection'
+        backendAzureRmStorageAccountName: '20sep26'
+        backendAzureRmContainerName: 'tfstate'
+        backendAzureRmKey: 'dev.tfstate'
+    - task: TerraformTask@5
+      inputs:
+        provider: 'azurerm'
+        command: 'plan'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/dev'
+        environmentServiceNameAzureRM: 'yamlconnection'
+
+________________________________________________________________________________________
+
+Terraform init validate and terrform plan and apply and manual approval 
+________________________________________________________________________________________
+
+pool: yamlagent
+stages:
+- stage: Terraforminitandvalidate
+  displayName: Terraform init and validate
+  jobs:
+  - job: Terraforminitvalidate
+    displayName: Terraform init and validate
+    steps:
+    - task: TerraformTask@5
+      displayName: Terraform init
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/prod'
+        backendServiceArm: 'yamlconnection'
+        backendAzureRmStorageAccountName: 'devopsbackendstorage'
+        backendAzureRmContainerName: 'backendcontainer'
+        backendAzureRmKey: '22sep.tfstate'
+    - task: TerraformTask@5
+      displayName: Terraform validate
+      inputs:
+        provider: 'azurerm'
+        command: 'validate'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/prod'
+
+- stage: Terraformplan
+  displayName: Terraform plan
+  jobs:
+  - job: terraformplan
+    displayName: Terraform plan
+    steps:
+    - task: TerraformTask@5
+      displayName: Terraform init
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/prod'
+        backendServiceArm: 'yamlconnection'
+        backendAzureRmStorageAccountName: 'devopsbackendstorage'
+        backendAzureRmContainerName: 'backendcontainer'
+        backendAzureRmKey: '22sep.tfstate'
+- stage: Manualvalidation
+  displayName: Manual validation
+  jobs:
+  - job: Manualapproval
+    displayName: Manual approval
+    pool: server   # this is mandatory 
+    steps:
+    - task: ManualValidation@1
+      inputs:
+        notifyUsers: 'abc@abc.com'
+        instructions: 'please approve'
+- stage: Terraformapply
+  displayName: Terraform apply
+  jobs:
+  - job: Terraformapply
+    displayName: Terraform apply
+    steps:
+    - task: TerraformTask@5
+      displayName: Terraform init
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/prod'
+        backendServiceArm: 'yamlconnection'
+        backendAzureRmStorageAccountName: 'devopsbackendstorage'
+        backendAzureRmContainerName: 'backendcontainer'
+        backendAzureRmKey: '22sep.tfstate'
+    - task: TerraformTask@5
+      displayName: Terraform apply
+      inputs:
+        provider: 'azurerm'
+        command: 'apply'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/prod'
+        environmentServiceNameAzureRM: 'yamlconnection'
+    
+	
+	
+________________________________________________________________________________________
+
+Pipeline with tirigger to main branch and manual validate 
+________________________________________________________________________________________
+
+
+pool: CASNGIN
+trigger:
+  branches:
+    include:
+    - main
+stages:
+- stage: Terraforminit
+  displayName: Terraform init and validate
+  jobs:
+  - job: Terraforminitandvalidate
+    displayName: Terraform init and validate
+    steps:
+    - task: TerraformTask@5
+      displayName: Terraform init
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/dev'
+        backendServiceArm: 'CASNGIN'
+        backendAzureRmStorageAccountName: '20sep26'
+        backendAzureRmContainerName: 'tfstate'
+        backendAzureRmKey: '24sep26'
+    - task: TerraformTask@5
+      displayName: Terraform validate
+      inputs:
+        provider: 'azurerm'
+        command: 'validate'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/dev'
+- stage: Manualvalidate
+  jobs:
+  - job: Manualvalidation
+    pool: server
+    steps:
+    - task: ManualValidation@1
+      displayName: Manual validate
+      inputs:
+        notifyUsers: 'abc@abc.com'
+        instructions: 'please approve'
+- stage: Terraformplan
+  displayName: Terraform init and plan
+  jobs:
+  - job: terraformplan
+    displayName: Terraform plan after init
+    steps:
+    - task: TerraformTask@5
+      displayName: Terraform init
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/dev'
+        backendServiceArm: 'CASNGIN'
+        backendAzureRmStorageAccountName: '20sep26'
+        backendAzureRmContainerName: 'tfstate'
+        backendAzureRmKey: '24sep26'
+    - task: TerraformTask@5
+      displayName: Terraform plan
+      inputs:
+        provider: 'azurerm'
+        command: 'plan'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/dev'
+        environmentServiceNameAzureRM: 'CASNGIN'
+
+     
+________________________________________________________________________________________
+
+Pipeline with condition
+________________________________________________________________________________________
+
+
+pool: yamlagent
+
+trigger:
+  branches:
+    include:
+    - main
+    - feature/*
+stages:
+- stage: Scan
+  displayName: Scan
+  jobs:
+  - job: Tflintandtfsec
+    displayName: Tflint and tfsec
+    steps:
+    - task: PowerShell@2
+      displayName: tflint
+      inputs:
+        targetType: 'inline'
+        script: 'tflint --recursive --force'
+    - task: PowerShell@2
+      displayName: Tfsec
+      inputs:
+        targetType: 'inline'
+        script: 'tfsec'
+    
+- stage: Plan
+  displayName: Plan
+  jobs:
+  - job: installterraform
+    displayName: Install terraform
+    steps:
+    - task: TerraformInstaller@1
+      displayName: Terraform install
+      inputs:
+        terraformVersion: 'latest'
+  - job: init
+    displayName: Init and Plan
+    steps:
+    - task: TerraformTask@5
+      displayName: terraform init
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/prod'
+        backendServiceArm: 'yamlconnection'
+        backendAzureRmStorageAccountName: 'devopsbackendstorage'
+        backendAzureRmContainerName: 'backendcontainer'
+        backendAzureRmKey: '28sep.tfstate'
+    - task: TerraformTask@5
+      displayName: Terraform validate
+      inputs:
+        provider: 'azurerm'
+        command: 'validate'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/prod'
+    - task: TerraformTask@5
+      displayName: Terraform plan
+      inputs:
+        provider: 'azurerm'
+        command: 'plan'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/prod'
+        environmentServiceNameAzureRM: 'yamlconnection'
+- stage: Validation
+  jobs:
+  - job: Approval
+    displayName: Manual validation
+    pool: server
+    steps:
+    - task: ManualValidation@1
+      inputs:
+        notifyUsers: 'abc@abc.com'
+        instructions: 'please approve'
+- stage: Apply
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  jobs:
+  - job: Apply
+    displayName: Terraform Apply
+    steps:
+    - task: TerraformTask@5
+      displayName: terraform init
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/prod'
+        backendServiceArm: 'yamlconnection'
+        backendAzureRmStorageAccountName: 'devopsbackendstorage'
+        backendAzureRmContainerName: 'backendcontainer'
+        backendAzureRmKey: '28sep.tfstate'
+    - task: TerraformTask@5
+      displayName: Terraform Apply
+      inputs:
+        provider: 'azurerm'
+        command: 'apply'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/prod'
+        environmentServiceNameAzureRM: 'yamlconnection'
+________________________________________________________________________________________
+
+prallel jobs and feature branch se apply tak and main Brach se plan tak
+________________________________________________________________________________________
+
+pool: yamlagent
+
+trigger:
+  branches:
+    include:
+    - main
+    - feature/fe
+stages:
+- stage: INIT
+  displayName: VALIDATE
+  dependsOn: []
+  jobs:
+  - job: INITValidate
+    displayName: INIT FMT and VALIDATE
+    steps:
+    - task: TerraformInstaller@1
+      displayName: Terraform installation
+      inputs:
+        terraformVersion: 'latest'
+    - task: TerraformTask@5
+      displayName: Terraform init
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/environment/dev'
+        backendServiceArm: 'yamlconnection'
+        backendAzureRmStorageAccountName: 'devopsbackendstorage'
+        backendAzureRmContainerName: 'backendcontainer'
+        backendAzureRmKey: '3oct.tfstate'
+    - task: TerraformTask@5
+      displayName: Terraform validate
+      inputs:
+        provider: 'azurerm'
+        command: 'validate'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/environment/dev'
+- stage: Scan
+  displayName: SCAN
+  dependsOn:
+  - INIT
+  jobs:
+  - job: scan
+    displayName: tflint and tfsec
+    steps:
+    - task: PowerShell@2
+      displayName: TFLINT
+      inputs:
+        targetType: 'inline'
+        script: |
+          cd environment/dev
+          tflint --recursive
+    - task: PowerShell@2
+      displayName: TFSEC
+      inputs:
+        targetType: 'inline'
+        script: |
+          cd environment/dev
+          tfsec
+- stage: Plan
+  displayName: PLAN
+  dependsOn:
+  - INIT
+  jobs:
+  - job: Plan
+    displayName: PLAN
+    steps:
+    - task: TerraformTask@5
+      displayName: Terraform init
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/environment/dev'
+        backendServiceArm: 'yamlconnection'
+        backendAzureRmStorageAccountName: 'devopsbackendstorage'
+        backendAzureRmContainerName: 'backendcontainer'
+        backendAzureRmKey: '3oct.tfstate'
+    - task: TerraformTask@5
+      displayName: Terraform plan
+      inputs:
+        provider: 'azurerm'
+        command: 'plan'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/environment/dev'
+        environmentServiceNameAzureRM: 'yamlconnection'
+- stage: Approval
+  displayName: APPROVAL
+  pool: server
+  jobs:
+  - job: Approval
+    displayName: APPROVAL
+    steps:
+    - task: ManualValidation@1
+      inputs:
+        notifyUsers: 'abc@abc.com'
+        instructions: 'please approve'
+- stage: apply
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  displayName: APPLY
+  jobs:
+  - job: apply
+    displayName: APPLY
+    steps:
+    - task: TerraformTask@5
+      displayName: Terraform init
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/environment/dev'
+        backendServiceArm: 'yamlconnection'
+        backendAzureRmStorageAccountName: 'devopsbackendstorage'
+        backendAzureRmContainerName: 'backendcontainer'
+        backendAzureRmKey: '3oct.tfstate'
+    - task: TerraformTask@5
+      displayName: APPLY
+      inputs:
+        provider: 'azurerm'
+        command: 'apply'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/environment/dev'
+        environmentServiceNameAzureRM: 'yamlconnection'
+		
+		
+		
+		
+________________________________________________________________________________________________________________________________
+
+All scan plan and  approval and apply with parameter and condition with feature and main branch to run apply stage
+________________________________________________________________________________________________________________________________
+
+pool : yamlagent
+
+parameters:
+  - name: runplan
+    displayName: Run plan 
+    type: boolean
+    default: false
+  - name: runtflint
+    displayName: run tflint
+    type: boolean
+    default: false
+  - name: runtfsec
+    displayName: run tfsec
+    type: boolean
+    default: false
+  - name: runcheckov
+    displayName: run checkov
+    type: boolean
+    default: false
+  - name: runapproval
+    displayName: run Manualapproval
+    type: boolean
+    default: false
+
+
+trigger:
+- main
+- feature/*
+
+
+stages:
+- stage: tflint
+  displayName: tflint Run
+  condition: ${{ parameters.runtflint }}
+  dependsOn: []
+  jobs:
+  - job: tflint
+    displayName: TFLINT SCAN
+    steps:
+    - task: PowerShell@2
+      inputs:
+        targetType: 'inline'
+        script: |
+          tflint --recursive --force
+- stage: tfsec
+  displayName: tfsec Run
+  condition: ${{ parameters.runtfsec }}
+  dependsOn: []
+  jobs:
+  - job: tfsec
+    displayName: tfsec scab
+    steps:
+    - task: PowerShell@2
+      displayName: tfsec
+      inputs:
+        targetType: 'inline'
+        script: 'tfsec $(System.DefaultWorkingDirectory)/enviroment/prod'
+- stage: checkov
+  displayName: checkov scan Run
+  condition: ${{ parameters.runcheckov }}
+  dependsOn: []
+  jobs:
+  - job: checkov
+    displayName: checkov
+    steps:
+    - task: PowerShell@2
+      inputs:
+        targetType: 'inline'
+        script: 'checkov -d "$(Build.SourcesDirectory)/environment/prod" --framework terraform'
+- stage: Plan
+  displayName: Plan Run
+  condition: ${{ parameters.runplan }}
+  dependsOn: []
+  jobs:
+  - job: Plan
+    steps:
+    - task: TerraformInstaller@1
+      inputs:
+        terraformVersion: 'latest'
+    - task: TerraformTask@5
+      displayName: terraform init
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/enviroment/prod'
+        backendServiceArm: 'yamlconnection'
+        backendAzureRmStorageAccountName: 'devopsbackendstorage'
+        backendAzureRmContainerName: 'backendcontainer'
+        backendAzureRmKey: '5oct.tfstate'
+    - task: TerraformTask@5
+      displayName: terraform plan
+      inputs:
+        provider: 'azurerm'
+        command: 'plan'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/enviroment/prod'
+        environmentServiceNameAzureRM: 'yamlconnection'
+- stage: Manualapproval
+  pool: server
+  displayName: Manual Approval
+  condition: ${{ parameters.runapproval }}
+  dependsOn:
+  - Plan
+  - tflint
+  - tfsec
+  - checkov
+  jobs:
+  - job: Manualapproval
+    displayName: Manual Approval
+    steps:
+    - task: ManualValidation@1
+      displayName: Manual Approval
+      inputs:
+        notifyUsers: 'abc@abc.com'
+        instructions: 'please approve'
+- stage: Apply
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  displayName: Apply
+  dependsOn: 
+  - Manualapproval
+  jobs:
+  - job: Apply
+    displayName: Apply 
+    steps:
+    - task: TerraformTask@5
+      displayName: Apply
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/enviroment/prod'
+        backendServiceArm: 'yamlconnection'
+        backendAzureRmStorageAccountName: 'devopsbackendstorage'
+        backendAzureRmContainerName: 'backendcontainer'
+        backendAzureRmKey: '5oct.tfstate'
+    - task: TerraformTask@5
+      displayName: Apply
+      inputs:
+        provider: 'azurerm'
+        command: 'apply'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/enviroment/prod'
+        environmentServiceNameAzureRM: 'yamlconnection'
+________________________________________________________________________________________________________________________________
+
+Pipeline with parameter, stages and (radio button for dev and prod checkbox for scan stage) 
+________________________________________________________________________________________________________________________________
+
+pool: yamlagent
+
+parameters:
+- name: enviroment
+  displayName: Environment
+  default: prod
+  type: string
+  values:
+  - prod
+  - dev
+- name: Validate
+  displayName: Validate run ?
+  default: false
+  type: boolean
+- name: tflint
+  displayName:  tflint run ?
+  default: false
+  type: boolean
+- name: tfsec
+  displayName:  tfsec run ?
+  default: false
+  type: boolean
+- name: checkov
+  displayName:  checkov run ?
+  default: false
+  type: boolean
+
+trigger:
+  branches: # Branch names to include or exclude for triggering a run.
+    include:
+    - main
+    - feature/*
+  paths:
+    include:
+    - enviroment/prod
+stages:
+- stage: validate
+  displayName: validate
+  condition: ${{ parameters.Validate }}
+  dependsOn: []
+  jobs:
+  - job: validate
+    displayName: validate
+    steps:
+    - task: TerraformInstaller@1
+      inputs:
+        terraformVersion: 'latest'
+    - task: TerraformTask@5
+      displayName: Terraform init
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/enviroment/prod'
+        backendServiceArm: 'yamlconnection'
+        backendAzureRmStorageAccountName: 'devopsbackendstorage'
+        backendAzureRmContainerName: 'devopsbackendstorage'
+        backendAzureRmKey: '7oct.tfstate'
+    - task: TerraformTask@5
+      displayName: Terraform validate
+      inputs:
+        provider: 'azurerm'
+        command: 'validate'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/enviroment/prod'
+- stage: tflint
+  displayName: tflint
+  condition: ${{ parameters.tflint }}
+  dependsOn: []
+  jobs:
+  - job: tflint
+    displayName: tflint
+    steps:
+    - task: PowerShell@2
+      displayName: tflint
+      inputs:
+        targetType: 'inline'
+        script: 'tflint --recursive --force'
+- stage: tfsec
+  displayName: tfsec
+  condition: ${{ parameters.tfsec }}
+  dependsOn: []
+  jobs:
+  - job: tfsec
+    steps:
+    - task: PowerShell@2
+      displayName: tfsec
+      inputs:
+        targetType: 'inline'
+        script: 'tfsec $(System.DefaultWorkingDirectory)/enviroment/prod'
+- stage: checkov
+  displayName: checkov
+  condition: ${{ parameters.checkov }}
+  dependsOn: []
+  jobs:
+  - job: checkov
+    displayName: checkov
+    steps:
+    - task: PowerShell@2
+      displayName: checkov
+      inputs:
+        targetType: 'inline'
+        script: 'checkov -d "$(Build.SourcesDirectory)/environment/prod" --framework terraform'
+- stage: Plan
+  displayName: Plan
+  dependsOn:
+  - validate
+  - tflint
+  - tfsec
+  - checkov
+  condition: and(not(failed()), not(canceled()))
+  jobs:
+  - job: plan
+    steps:
+    - task: TerraformTask@5
+      displayName: Terraform init
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/enviroment/prod'
+        backendServiceArm: 'yamlconnection'
+        backendAzureRmStorageAccountName: 'devopsbackendstorage'
+        backendAzureRmContainerName: 'backendcontainer'
+        backendAzureRmKey: '7oct.tfstate'
+    - task: TerraformTask@5
+      displayName: Plan
+      inputs:
+        provider: 'azurerm'
+        command: 'plan'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/enviroment/prod'
+        environmentServiceNameAzureRM: 'yamlconnection'
+- stage: approval 
+  displayName: approval
+  dependsOn: Plan
+  condition: and(not(failed()), not(canceled())) # (ye conditon lagana zoorori hai wrna pipeline ka stage skip ho jata hai 
+  pool: server
+  jobs:
+  - job: approval
+    displayName: approval
+    steps:
+    - task: ManualValidation@1
+      displayName: approval
+      inputs:
+        notifyUsers: 'abc.abc@com'
+        instructions: 'Please approve'
+- stage: apply
+  displayName: Apply
+  condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
+  jobs:
+  - job: Apply
+    displayName: Apply
+    steps:
+    - task: TerraformTask@5
+      displayName: Terraform init
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/enviroment/prod'
+        backendServiceArm: 'yamlconnection'
+        backendAzureRmStorageAccountName: 'devopsbackendstorage'
+        backendAzureRmContainerName: 'backendcontainer'
+        backendAzureRmKey: '7oct.tfstate'
+    - task: TerraformTask@5
+      displayName: Terraform apply
+      inputs:
+        provider: 'azurerm'
+        command: 'apply'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/enviroment/prod'
+        environmentServiceNameAzureRM: 'yamlconnection'
+		
+		
+________________________________________________________________________________________________________________________________
+
+Variable ka use and define krna pipeline me also raido button use for dev and prod environment and <${{ parameters.enviroment }}> ka use
+_________________________________________________________________________________________________________________________________
+
+pool: yamlagent
+
+parameters:
+- name: enviroment
+  displayName: Environment
+  default: prod
+  type: string    # ye string values gives us radio button information deta hai or iska use dev or prod ko define krne me krte hai
+  values:
+  - prod
+  - dev
+- name: Validate
+  displayName: Validate run ?
+  default: false
+  type: boolean     # ye boolean values checkbox deta hai for check or uncheck
+- name: tflint
+  displayName:  tflint run ?
+  default: false
+  type: boolean
+- name: tfsec
+  displayName:  tfsec run ?
+  default: false
+  type: boolean
+- name: checkov
+  displayName:  checkov run ?
+  default: false
+  type: boolean
+
+trigger:
+  branches: # Branch names to include or exclude for triggering a run.
+    include:
+    - main
+    - feature/*
+  paths:
+    include:
+    - enviroment/prod
+stages:
+- stage: validate
+  displayName: validate
+  condition: ${{ parameters.Validate }}
+  dependsOn: []
+  jobs:
+  - job: validate
+    displayName: validate
+    steps:
+    - task: TerraformInstaller@1
+      inputs:
+        terraformVersion: 'latest'
+    - task: TerraformTask@5
+      displayName: Terraform init
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/enviroment/${{ parameters.enviroment }}'
+        backendServiceArm: 'yamlconnection'
+        backendAzureRmStorageAccountName: 'devopsbackendstorage'
+        backendAzureRmContainerName: 'devopsbackendstorage'
+        backendAzureRmKey: '7oct.tfstate'
+    - task: TerraformTask@5
+      displayName: Terraform validate
+      inputs:
+        provider: 'azurerm'
+        command: 'validate'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/enviroment/${{ parameters.enviroment }}'
+- stage: tflint
+  displayName: tflint
+  condition: ${{ parameters.tflint }}   # ye condition hame parameter values true ho to run krna ho bolta hai.
+  dependsOn: []
+  jobs:
+  - job: tflint
+    displayName: tflint
+    steps:
+    - task: PowerShell@2
+      displayName: tflint
+      inputs:
+        targetType: 'inline'
+        script: 'tflint --recursive --force'
+- stage: tfsec
+  displayName: tfsec
+  condition: ${{ parameters.tfsec }}
+  dependsOn: []
+  jobs:
+  - job: tfsec
+    steps:
+    - task: PowerShell@2
+      displayName: tfsec
+      inputs:
+        targetType: 'inline'
+        script: 'tfsec $(System.DefaultWorkingDirectory)/enviroment/${{ parameters.enviroment }}'
+- stage: checkov
+  displayName: checkov
+  condition: ${{ parameters.checkov }}
+  dependsOn: []
+  jobs:
+  - job: checkov
+    displayName: checkov
+    steps:
+    - task: PowerShell@2
+      displayName: checkov
+      inputs:
+        targetType: 'inline'
+        script: 'checkov -d "$(Build.SourcesDirectory)/environment/prod" --framework terraform'
+- stage: Plan
+  displayName: Plan
+  dependsOn:
+  - validate
+  - tflint
+  - tfsec
+  - checkov
+  condition: and(not(failed()), not(canceled()))
+  jobs:
+  - job: plan
+    steps:
+    - task: TerraformTask@5
+      displayName: Terraform init
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/enviroment/${{ parameters.enviroment }}'
+        backendServiceArm: 'yamlconnection'
+        backendAzureRmStorageAccountName: 'devopsbackendstorage'
+        backendAzureRmContainerName: 'backendcontainer'
+        backendAzureRmKey: '7oct.tfstate'
+    - task: TerraformTask@5
+      displayName: Plan
+      inputs:
+        provider: 'azurerm'
+        command: 'plan'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/enviroment/${{ parameters.enviroment }}'
+        environmentServiceNameAzureRM: 'yamlconnection'
+- stage: approval 
+  displayName: approval
+  dependsOn: Plan
+  condition: and(not(failed()), not(canceled()))
+  pool: server
+  jobs:
+  - job: approval
+    displayName: approval
+    steps:
+    - task: ManualValidation@1
+      displayName: approval
+      inputs:
+        notifyUsers: 'abc.abc@com'
+        instructions: 'Please approve'
+- stage: apply
+  displayName: Apply
+  condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
+  jobs:
+  - job: Apply
+    displayName: Apply
+    steps:
+    - task: TerraformTask@5
+      displayName: Terraform init
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/enviroment/${{ parameters.enviroment }}'
+        backendServiceArm: 'yamlconnection'
+        backendAzureRmStorageAccountName: 'devopsbackendstorage'
+        backendAzureRmContainerName: 'backendcontainer'
+        backendAzureRmKey: '7oct.tfstate'
+    - task: TerraformTask@5
+      displayName: Terraform apply
+      inputs:
+        provider: 'azurerm'
+        command: 'apply'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/enviroment/${{ parameters.enviroment }}'
+        environmentServiceNameAzureRM: 'yamlconnection'
+		
+		
+_________________________________________________________________________________________________________________________________
+
+this is same as above pipeline
+_________________________________________________________________________________________________________________________________
+
+pool: CASNGIN
+
+trigger:
+  branches: # Branch names to include or exclude for triggering a run.
+    include:
+    - main
+    - feature/*
+  paths: # File paths to include or exclude for triggering a run.
+    include:
+    - environment/*
+parameters:
+  - name: environment
+    type: string
+    default: prod
+    values:
+    - prod
+    - dev
+  - name: Plan
+    type: boolean
+    default: false
+  - name: tfsec
+    type: boolean
+    default: false
+  - name: tflint
+    type: boolean
+    default: false
+  - name: checkov
+    type: boolean
+    default: false
+  
+stages:
+- stage: Toolinstall
+  displayName: Toolinstall
+  dependsOn: []
+  jobs:
+  - job: installation
+    displayName: Terraform tool install
+    steps:
+    - task: TerraformInstaller@1
+      displayName: Tool install
+      inputs:
+        terraformVersion: 'latest'
+- stage: validate
+  displayName: validate
+  dependsOn:
+  - Toolinstall
+  condition: and(not(failed()), not(canceled())) 
+  jobs:
+  - job: validate
+    displayName: validate
+    steps:
+    - task: TerraformTask@5
+      displayName: Terraform init
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/environment/${{ parameters.environment }}'
+        backendServiceArm: 'CASNGIN'
+        backendAzureRmStorageAccountName: 'devopsbackendstorage'
+        backendAzureRmContainerName: 'backendcontainer'
+        backendAzureRmKey: '8oct.tfstate'
+    - task: TerraformTask@5
+      displayName: validate
+      inputs:
+        provider: 'azurerm'
+        command: 'validate'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/environment/${{ parameters.environment }}'
+- stage: tfsec
+  displayName: tfsec
+  condition: ${{ parameters.tfsec }}
+  dependsOn: 
+  - Toolinstall
+  jobs:
+  - job: tfsec
+    steps:
+    - task: PowerShell@2
+      inputs:
+        targetType: 'inline'
+        script: 'tfsec $(System.DefaultWorkingDirectory)/environment/${{ parameters.environment }}'
+- stage: tflint
+  displayName: tflint
+  condition: ${{ parameters.tflint }}
+  dependsOn: 
+  - Toolinstall
+  jobs:
+  - job: tflint
+    displayName: tflint
+    steps:
+    - task: PowerShell@2
+      displayName: tflint
+      inputs:
+        targetType: 'inline'
+        script: 'tflint --recursive --force'
+- stage: checkov
+  displayName: checkov
+  condition: ${{ parameters.checkov }}
+  dependsOn: 
+  - Toolinstall
+  jobs:
+  - job: checkov
+    displayName: checkov
+    steps:
+    - task: PowerShell@2
+      inputs:
+        targetType: 'inline'
+        script: |
+          checkov -d "$(Build.SourcesDirectory)/environment/${{ parameters.environment }}" --framework terraform
+          
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Host "Checkov found security issues, but pipeline will continue."
+                    exit 0
+                }
+          
+                Write-Host "Checkov scan completed successfully."
+                exit 0
+- stage: Plan
+  displayName: plan
+  condition: and( eq ('${{ parameters.plan }}', true), not(failed()), not(canceled()))
+  dependsOn:
+  - validate
+  - tfsec
+  - tflint
+  - checkov
+  jobs:
+  - job: plan
+    displayName: plan  
+    steps:
+    - task: TerraformTask@5
+      displayName: Terraform init
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/environment/${{ parameters.environment }}'
+        backendServiceArm: 'CASNGIN'
+        backendAzureRmStorageAccountName: 'devopsbackendstorage'
+        backendAzureRmContainerName: 'backendcontainer'
+        backendAzureRmKey: '8oct.tfstate'
+    - task: TerraformTask@5
+      displayName: Plan
+      inputs:
+        provider: 'azurerm'
+        command: 'plan'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/environment/${{ parameters.environment }}'
+        environmentServiceNameAzureRM: 'CASNGIN'
+- stage: Approval
+  pool: server
+  displayName: approval
+  dependsOn: 
+  - plan
+  condition: and(not(failed()), not(canceled()))
+  jobs:
+  - job:
+    displayName: approval
+    steps:
+    - task: ManualValidation@1
+      inputs:
+        notifyUsers: 'abc.abc@gmail.com'
+- stage: Apply
+  displayName: Apply
+  condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
+  jobs:
+  - job: apply
+    displayName: apply
+    steps:
+    - task: TerraformTask@5
+      displayName: Terraform init
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/environment/${{ parameters.environment }}'
+        backendServiceArm: 'CASNGIN'
+        backendAzureRmStorageAccountName: 'devopsbackendstorage'
+        backendAzureRmContainerName: 'backendcontainer'
+        backendAzureRmKey: '8oct.tfstate'
+    - task: TerraformTask@5
+      displayName: Apply
+      inputs:
+        provider: 'azurerm'
+        command: 'apply'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/environment/${{ parameters.environment }}'
+        environmentServiceNameAzureRM: 'CASNGIN'
+		
+		
+_________________________________________________________________________________________________________________________________
+
+parameters is chalbo and nachalbo method and variable declare 
+
+________________________________________________________________________________________________________________________________
+
+pool: yamlagent
+
+variables:
+  isMain: $[ eq(variables['Build.SourceBranch'], 'refs/heads/main') ]
+  workdir: $(System.DefaultWorkingDirectory)/Environment/dev
+
+trigger:
+  branches:
+    include:
+    - main
+    - feature/*
+  paths: 
+    include:
+    - Environment/dev
+parameters:
+  - name: Tflint
+    type: string
+    default: skip
+    values:
+    - run
+    - skip
+  - name: Tfsec
+    type: string
+    default: skip
+    values:
+    - run
+    - skip
+  - name: checkov
+    type: string
+    default: skip
+    values:
+    - run
+    - skip
+stages:
+- stage: Toolinstall
+  displayName: Tool install
+  jobs:
+  - job: toolinstall
+    displayName: terraform install
+    steps:
+    - task: TerraformInstaller@1
+      inputs:
+        terraformVersion: 'latest'
+- stage: Validate
+  displayName: Validate
+  dependsOn: toolinstall
+  jobs:
+  - job: terraforminit
+    steps:
+    - task: TerraformTask@5
+      displayName: terraform init
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: ''
+        backendServiceArm: 'yamlagent'
+        backendAzureRmStorageAccountName: 'storageravi14102026'
+        backendAzureRmContainerName: 'ravicontainer'
+        backendAzureRmKey: '14oct.tfstate'
+    - task: TerraformTask@5
+      displayName: terraform validate
+      inputs:
+        provider: 'azurerm'
+        command: 'validate'
+        workingDirectory: ''
+- stage: Tflint
+  displayName: Tflint scan
+  dependsOn: toolinstall
+  condition: eq('${{parameters.Tflint}}', 'run')
+  jobs:
+  - job: tflint
+    displayName: tflint
+    steps:
+    - task: PowerShell@2
+      inputs:
+        targetType: 'inline'
+        script: |
+          cd Environment/dev
+          tflint --recursive --force
+- stage: tfsec
+  displayName: Tfsec scan
+  dependsOn: toolinstall
+  condition: eq('${{parameters.Tfsec}}', 'run')
+  jobs:
+  - job: tfsec
+    displayName: tfsec scan
+    steps:
+    - task: PowerShell@2
+      inputs:
+        targetType: 'inline'
+        script: 'tfsec $(workdir)'
+- stage: checkov
+  displayName: Checkov scan
+  dependsOn: toolinstall
+  condition: eq('${{parameters.checkov}}', 'run')
+  jobs:
+  - job: checkov
+    displayName: checkov scan
+    steps:
+    - task: PowerShell@2
+      inputs:
+        targetType: 'inline'
+        script: 'checkov -d $(workdir) --framework terraform'
+- stage: Plan
+  displayName: Plan
+  dependsOn: 
+  - validate
+  - tflint
+  - tfsec
+  - checkov
+  condition: and(not(failed()), not(canceled()))
+  jobs:
+  - job: plan
+    displayName: Plan
+    steps:
+    - task: TerraformTask@5
+      displayName: terraform init
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(workdir)'
+        backendServiceArm: 'yamlagent'
+        backendAzureRmStorageAccountName: 'storageravi14102026'
+        backendAzureRmContainerName: 'ravicontainer'
+        backendAzureRmKey: '14oct.tfstate'
+    - task: TerraformTask@5
+      inputs:
+        provider: 'azurerm'
+        command: 'plan'
+        workingDirectory: '$(workdir)'
+        environmentServiceNameAzureRM: 'yamlagent'
+- stage: Approval
+  displayName: Approval
+  pool: server
+  condition: not(canceled())
+  jobs:
+  - job: approval
+    steps:
+    - task: ManualValidation@1
+      inputs:
+        notifyUsers: 'abc.abc@gmail.com'
+        instructions: 'please approve this.'
+- stage: Apply
+  displayName: Apply
+  dependsOn: Approval
+ # condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  condition: eq(variables.isMain, true)
+  jobs:
+  - job: apply
+    displayName: Apply
+    steps:
+    - task: TerraformTask@5
+      displayName: init step
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(workdir)'
+        backendServiceArm: 'yamlagent'
+        backendAzureRmStorageAccountName: 'storageravi14102026'
+        backendAzureRmContainerName: 'ravicontainer'
+        backendAzureRmKey: '14oct.tfstate'
+    - task: TerraformTask@5
+      displayName: Apply
+      inputs:
+        provider: 'azurerm'
+        command: 'apply'
+        workingDirectory: '$(workdir)'
+        environmentServiceNameAzureRM: 'yamlagent'
+    
